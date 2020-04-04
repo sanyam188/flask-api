@@ -1,5 +1,12 @@
 from flask import Flask,render_template,jsonify,request
 app = Flask(__name__)
+import sqlite3
+
+def dict_factory(cursor, row):
+    d = {}
+    for idx, col in enumerate(cursor.description):
+        d[col[0]] = row[idx]
+    return d
 
 @app.route('/')
 def hello():
@@ -30,20 +37,54 @@ def hello1(user):
 
 @app.route('/link/all')
 def api_all():
-    return jsonify(books)
+    con=sqlite3.connect('books.db')
+    con.row_factory = dict_factory
+    cur=con.cursor()
+    all_books=cur.execute('select * from books;').fetchall()
+    return jsonify(all_books)
+
+
+@app.errorhandler(404)
+def page_not_found(e):
+    return "<h1>404</h1><p>The resource could not be found.</p>", 404
+
 
 @app.route('/link/')
 def api_search():
-    if 'id' in request.args:
-        id=int(request.args['id'])
-    else:
-        return "Ops Error"
+    query_para=request.args
+    id=query_para.get('id')
+    pub=query_para.get('published')
+    aut=query_para.get('author')
 
-    res=[]
+    query="select * from books where "
+    filter=[]
 
-    for b in books:
-        if id==b['id']:
-            res.append(b)
+    if id:
+        query+='id=? AND '
+        filter.append(id)
+    if aut:
+        query+='author=? AND '
+        filter.append(aut)
+    if pub:
+        query+='published=? AND '
+        filter.append(pub)
+
+
+    query=query[:-4]+';'
+    con=sqlite3.connect('books.db')
+    con.row_factory = dict_factory
+    cur=con.cursor()
+    res=cur.execute(query, filter).fetchall()
+    # if 'id' in request.args:
+    #     id=int(request.args['id'])
+    # else:
+    #     return "Ops Error"
+
+    # res=[]
+
+    # for b in books:
+    #     if id==b['id']:
+    #         res.append(b)
 
     return jsonify(res)
 
